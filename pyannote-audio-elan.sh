@@ -14,7 +14,7 @@
 # ** Edit the following line to point to the directory in which 'ffmpeg' is
 # ** found on this computer.
 # **
-export FFMPEG_DIR="/Users/chris/Unix"
+export FFMPEG_DIR="/usr/bin/"
 
 export LC_ALL="en_US.UTF-8"
 export PYTHONIOENCODING="utf-8"
@@ -26,5 +26,5 @@ export PATH="$PATH:$FFMPEG_DIR"
 export PYTORCH_ENABLE_MPS_FALLBACK=1
 
 # Activate the virtual environment, then execute the main recognizer script.
-source ./venv-pyannote/bin/activate
-exec python3 ./pyannote-audio-elan.py $1
+source ./venv-pyannote-audio-elan/bin/activate
+exec python3 ./pyannote-audio-elan.py $1 >> ./elan_wrapper_debug.log 2>&1

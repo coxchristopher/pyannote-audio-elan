@@ -247,7 +247,7 @@ if torch.backends.mps.is_available() and torch.backends.mps.is_built():
     if 'apple m' in cpuinfo.get_cpu_info().get('brand_raw').lower():
         device = 'mps'
         pipeline.to(torch.device('mps'))
-elif torch.backends.cuda.is_available() and torch.backends.cuda.is_built():
+elif torch.cuda.is_available() and torch.backends.cuda.is_built():
     device = 'cuda'
     pipeline.to(torch.device('cuda'))
 

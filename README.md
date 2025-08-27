@@ -19,8 +19,9 @@ git clone https://github.com/coxchristopher/pyannote-audio-elan
 cd pyannote-audio-elan
 
 python3.10 -m venv venv-pyannote-audio-elan
-source venv-pyannote-audio-elan
+source venv-pyannote-audio-elan/bin/activate
 pip install -r requirements.txt
+chmod +x pyannote-audio-elan.sh
 ```
 
 Once all of these tools and packages have been installed, pyannote-audio-elan can be made available to ELAN as follows:

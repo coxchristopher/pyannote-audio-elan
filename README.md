@@ -8,10 +8,9 @@ In addition to performing voice activity detection and speaker diarization, pyan
 
 pyannote-audio-elan makes use of several of other open-source applications and utilities:
 
-* [ELAN](https://tla.mpi.nl/tools/tla-tools/elan/) (tested with ELAN 6.7-6.9
-  under macOS 13-15)
+* [ELAN](https://tla.mpi.nl/tools/tla-tools/elan/) (tested with ELAN 6.7-7.0
+  under macOS 13-15 and Windows 11)
 * [Python 3](https://www.python.org/) (tested with Python 3.10)
-* [ffmpeg](https://ffmpeg.org)
 
 pyannote-audio-elan is written in Python 3, and also depends on a number of Python packages that can be installed using `pip` in a virtual environment. Under macOS 15, the following commands can be used to fetch and install the necessary Python packages:
 ```
@@ -26,16 +25,16 @@ chmod +x pyannote-audio-elan.sh
 
 Once all of these tools and packages have been installed, pyannote-audio-elan can be made available to ELAN as follows:
 
-1. Edit the file `pyannote-audio-elan.sh` to specify (a) the directory in which ffmpeg is located, and (b) a Unicode-friendly language and locale (if `en_US.UTF-8` isn't available on your computer).
+1. Edit the file `pyannote-audio-elan.sh` (macOS) or `pyannote-audio-elan.bat` (Windows) to specify a Unicode-friendly language and locale (if `en_US.UTF-8` isn't available on your computer).
 2. To make pyannote-audio-elan available to ELAN, move your pyannote-audio-elan directory into ELAN's `extensions` directory.  This directory is found in different places under different operating systems:
    
-   * Under macOS, right-click on `ELAN_6.9` in your `/Applications`
+   * Under macOS, right-click on `ELAN_7.0` in your `/Applications`
      folder and select "Show Package Contents", then copy your
-     `pyannote-audio-elan` folder into `ELAN_6.9.app/Contents/app/extensions`.
+     `pyannote-audio-elan` folder into `ELAN_7.0.app/Contents/app/extensions`.
    * Under Linux, copy your `pyannote-audio-elan` folder into
-     `ELAN_6-9/app/extensions`.
+     `ELAN_7-0/app/extensions`.
    * Under Windows, copy your `pyannote-audio-elan` folder into
-     `C:\Users\AppData\Local\ELAN_6-9\app\extensions`.
+     `C:\Users\AppData\Local\ELAN_7-0\app\extensions`.
 
 Once ELAN is restarted, it will now include two new options in the list of services found under the 'Recognizer' tab in Annotation Mode: 'pyannote.audio speaker diarization with speaker verification' (for overlap-aware speaker diarization with optional speaker verification) and 'pyannote.audio voice activity detection' (for basic voice activity detection, without any speaker diarization applied).  The user interfaces for both recognizers allow users to enter the settings needed to apply speaker diarization media linked to this ELAN transcript (e.g., optionally specifying the exact number of speakers that are present in this recording, if known, or a maximum number of speakers that may be present, which can improve the accuracy of speaker diarization).
 
@@ -49,7 +48,7 @@ Importantly, pyannote-audio-elan currently requires access to pyannote.audio's [
 
 ## Limitations
 
-This is an alpha release of pyannote-audio-elan, and has only been tested under macOS (13-15) with Python 3.10.  No support for Windows or Linux is included in this version.
+This is an alpha release of pyannote-audio-elan, and has only been tested under macOS (13-15) and Windows (11, Intel 64-bit) with Python 3.10.  No support for Linux is included in this version.
 
 As noted above, installing and using pyannote-audio-elan currently requires an internet connection (at least the first time that pyannote-audio-elan is used, so that the segmentation and diarization pipelines can be downloaded from Hugging Face) and some familiarity with command-line software development tools.  We hope to reduce (and, ideally, eliminate) these requirements in the future, providing pre-packaged, offline-friendly versions of these recognizers that offer more user-friendly installation options (see the pyannote.audio
 [tutorial](https://github.com/pyannote/pyannote-audio/blob/develop/tutorials/community/offline_usage_speaker_diarization.ipynb) on offline speaker diarization and Lorena Martín Rodríguez's [SileroVAD-Elan](https://github.com/l12maro/SileroVAD-Elan) project for examples of how this might be done).
@@ -63,13 +62,13 @@ particularly of the fine-tuning process.  Thanks, as well, to [Han Sloetjes](htt
 
 If referring to this code in a publication, please consider using the following citation:
 
-> Cox, Christopher. 2025. pyannote-audio-elan: An implementation of pyannote.audio speaker diarization and voice activity detection services as a recognizer for ELAN. Version 0.1.0.
+> Cox, Christopher. 2025. pyannote-audio-elan: An implementation of pyannote.audio speaker diarization and voice activity detection services as a recognizer for ELAN. Version 0.2.0.
 
 ```
 @manual{cox25pyannoteaudioelan,
     title = {pyannote-audio-elan: An implementation of pyannote.audio speaker diarization and voice activity detection services as a recognizer for {ELAN}.},
     author = {Christopher Cox},
     year = {2025}
-    note = {Version 0.1.0},
+    note = {Version 0.2.0},
     }
 ```

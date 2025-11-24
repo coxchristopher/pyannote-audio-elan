@@ -1,2 +1,0 @@
-best_clustering_threshold = 0.6939225490462559
-best_segmentation_threshold = 0.5079476690981549

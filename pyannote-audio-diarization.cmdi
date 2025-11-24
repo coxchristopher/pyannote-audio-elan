@@ -20,7 +20,10 @@
             The "info" element contains the name as it will be shown in the user interface. Try to define a name
             that makes it likely to be unique, e.g by including an institution or university acronym.
             -->
-            <recognizer recognizerType="local" runLinux="./pyannote-audio-elan.sh Diarization" runMac="./pyannote-audio-elan.sh Diarization" runWin=".\pyannote-audio-elan.bat Diarization"
+            <recognizer recognizerType="local"
+                runLinux="./pyannote-audio-elan.sh Diarization"
+                runMac="./pyannote-audio-elan.sh Diarization"
+                runWin="cmd.exe /c pyannote-audio-elan.bat Diarization"
                 info="pyannote.audio speaker diarization with speaker verification">pyannote_audio_speaker_diarization_with_speaker_verification</recognizer>
 
             <!-- For a more detailed documentation, a HTML file linked to the recognizer. This HTML ships with the 

@@ -9,6 +9,7 @@
 SET LC_ALL="en_US.UTF-8"
 SET PYTHONIOENCODING="utf-8"
 
-:: Activate the virtual environment, then execute the main recognizer script.
-call ".\venv-pyannote-audio-elan\Scripts\activate.bat"
-".\venv-pyannote-audio-elan\Scripts\python.exe" "pyannote-audio-elan.py" %1 >> ".\elan_wrapper_debug.log" 2>&1
+:: Execute the main recognizer script from the version of Python referred to
+:: within the virtual environment, which automatically activates the virtual
+:: environment.
+start /b /w venv-pyannote-audio-elan\Scripts\python.exe pyannote-audio-elan.py %1

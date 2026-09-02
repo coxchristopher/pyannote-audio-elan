@@ -21,10 +21,10 @@
             that makes it likely to be unique, e.g by including an institution or university acronym.
             -->
             <recognizer recognizerType="local"
-                runLinux="./pyannote-audio-elan.sh VAD"
-                runMac="./pyannote-audio-elan.sh VAD"
-                runWin="cmd.exe /c pyannote-audio-elan.bat VAD"
-                info="pyannote.audio voice activity detection">pyannote_audio_vad</recognizer>
+                runLinux="./pyannote-audio-elan.sh"
+                runMac="./pyannote-audio-elan.sh"
+                runWin="cmd.exe /c pyannote-audio-elan.bat"
+                info="pyannote.audio speaker diarization with speaker verification (community-1)">pyannote_audio_speaker_diarization_with_speaker_verification-community-1</recognizer>
 
             <!-- For a more detailed documentation, a HTML file linked to the recognizer. This HTML ships with the 
                  recognizer and gives extra explanations for using the recognizer and information about licenses, 
@@ -32,7 +32,7 @@
                  in the same directory tree as the CMDI file or (not recommended) a direct http link to a recognizer 
                  homepage elsewhere. 
             -->
-            <documentation>pyannote-audio-vad.html</documentation>
+            <documentation>pyannote-audio-diarization.html</documentation>
 
             <!--
             Any number of input and output parameters can be specified.
@@ -46,24 +46,37 @@
                 mimetypes="audio/x-wav"
                 info="Input audio file (WAV)">source</input>
 
-            <textparam level="basic" optional="false"
+            <textparam level="advanced" optional="true"
                 info="HuggingFace authentication token">auth_token</textparam>
 
             <input level="basic" type="auxiliary" optional="true"
                 mimetypes="*"
                 info="Path to segmentation model checkpoint (.ckpt, optional)">checkpoint</input>
 
+            <textparam level="basic" convoc="Unknown 1 2 3 4 5 6 7 8 9" 
+                default="Unknown"
+                info="Number of speakers, when known">num_speakers</textparam>
+
+            <textparam level="basic" convoc="_ 1 2 3 4 5 6 7 8 9" 
+                default="_"
+                info="Minimum number of speakers (when number of speakers is unknown)">min_speakers</textparam>
+
+            <textparam level="basic" convoc="_ 1 2 3 4 5 6 7 8 9" 
+                default="_"
+                info="Maximum number of speakers (when number of speakers is unknown)">max_speakers</textparam>
+
             <numparam level="basic" type="float" min="0.001" max="0.999" default="0.0979"
                 info="Shortest allowed period of silence">min_duration_off</numparam>
 
-            <numparam level="basic" type="float" min="0.001" max="0.999" default="0.0553"
-                info="Shortest allowed period of speech (VAD only)">min_duration_on</numparam>
+            <input level="basic" type="auxiliary" optional="true"
+                mimetypes="text/csv"
+                info="Speaker verification configuration (CSV) (optional)">speaker_verification_csv</input>
 
-            <numparam level="basic" type="float" min="0.001" max="0.999" default="0.6"
-                info="Speech onset detection threshold (VAD only)">onset</numparam>
+            <numparam level="advanced" type="float" min="0.001" max="0.999" default="0.45210161462756127"
+                info="Segmentation threshold (diarization hyperparameter)">segmentation_threshold</numparam>
 
-            <numparam level="basic" type="float" min="0.001" max="0.999" default="0.4"
-                info="Speech offset detection threshold (VAD only)">offset</numparam>
+            <numparam level="advanced" type="float" min="0.001" max="0.999" default="0.7433178174378083"
+                info="Clustering threshold (diarization hyperparameter)">clustering_threshold</numparam>
 
             <output level="basic" type="tier" optional="false"
                 mimetypes="text/xml" 

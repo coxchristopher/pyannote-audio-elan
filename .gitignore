@@ -1,2 +1,3 @@
 ./venv-pyannote-audio-elan
+.DS_Store
 *.log

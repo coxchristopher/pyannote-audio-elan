@@ -3,10 +3,15 @@
 # Set a number of environmental variables and locale-related settings needed
 # for this recognizer to run as expected before calling the recognizer itself.
 #
-# It seems that recognizer processes invoked by ELAN have their locale set
-# to C.  This implies a default ASCII file encoding, which causes some
-# scripts to refuse to run (since many assume a more Unicode-friendly view
-# of the world somewhere in their code).
+# It seems that recognizer processes invoked by ELAN don't inherit any regular
+# environmental variables (like PATH), which makes it difficult to track down
+# where both Python and ffmpeg(1) might be.  These same processes also have
+# their locale set to C.  This implies a default ASCII file encoding, which
+# causes some scripts to refuse to run (since many assume a more Unicode-
+# friendly view of the world somewhere in their code).
+
+export DYLD_LIBRARY_PATH="/usr/local/lib:/opt/local/lib:$DYLD_LIBRARY_PATH"
+export LD_LIBRARY_PATH="/opt/local/lib:/usr/local/lib:$LD_LIBRARY_PATH"
 
 export LC_ALL="en_US.UTF-8"
 export PYTHONIOENCODING="utf-8"
@@ -18,4 +23,5 @@ export PYTORCH_ENABLE_MPS_FALLBACK=1
 
 # Activate the virtual environment, then execute the main recognizer script.
 source ./venv-pyannote-audio-elan/bin/activate
-exec python3 ./pyannote-audio-elan.py $1 >> ./elan_wrapper_debug.log 2>&1
+exec python3 ./pyannote-audio-elan.py
+#exec python3 ./pyannote-audio-elan.py >> ./elan_wrapper_debug.log 2>&1

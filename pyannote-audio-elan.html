@@ -2,31 +2,39 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
     <head>
         <title>
-            pyannote.audio Voice Activity Detection
+            pyannote.audio Speaker Diarization
         </title>
     </head>
     <body>
-        <center><h3>pyannote.audio Voice Activity Detection</h3></center>
+        <center><h3>pyannote.audio Speaker Diarization</h3></center>
 
-        <p>This is a local ELAN recognizer that offers a voice activity
-        detection (VAD) service based on
+        <p>This is a local ELAN recognizer that provides a speaker diarization
+        service using
         <a href="https://github.com/pyannote/pyannote-audio">pyannote.audio</a>,
-        an open-source Python toolkit that separates audio into speech vs.
-        non-speech (among other tasks).  The user is able to select an input
-        audio file linked to this transcript, which this recognizer then passes
-        on to pyannote.audio for processing, producing a new tier containing
-        the segments of speech that pyannote.audio has identified.
-        </p>
+        an open-source Python toolkit for deep neural network-based speech
+        services.  The user is able to select an input audio file linked to
+        this transcript, which this recognizer then passes on to pyannote.audio
+        for processing, producing one or more new tiers containing the segments
+        of speech that pyannote.audio has identified as belonging to some
+        number of speakers.</p>
 
+        <p>Additionally, when given a CSV list of speaker names/identifiers
+        and matching audio samples of their speech, this recognizer is able
+        to identify which speaker is present on which new tier and name the
+        new tiers accordingly (i.e., rather than "Pyannote-SPEAKER_00", naming
+        the new tier "CDC" if the annotations on that tier most closely match
+        the voice in the speech sample provided for the speaker identified as
+        "CDC").</p>
+       
         <p>By default, this recognizer uses the pre-trained pyannote.audio
-        pipelines for voice activity detection made available through
+        pipelines for speaker diarization made available through
         <a href="https://huggingface.co/pyannote/">Hugging Face</a>.  Since
         these models are gated, it is necessary to sign into Hugging Face and
         request access to the following two models:</p>
 
         <ul>
             <li><a href="https://huggingface.co/pyannote/segmentation-3.0">pyannote/segmentation-3.0</a>
-            <li><a href="https://huggingface.co/pyannote/voice-activity-detection">pyannote/voice-activity-detection</a>
+            <li><a href="https://huggingface.co/pyannote/speaker-diarization-community-1">pyannote/speaker-diarization-community-1</a>
         </ul>
 
         <p>Once access has been granted to these repositories, it is possible

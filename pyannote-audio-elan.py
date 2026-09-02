@@ -1,9 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# A short script that wraps the voice activity detection and speaker
-# diarization services provided by pyannote.audio (https://github.com/
-# pyannote/pyannote-audio) to act as a local recognizer in ELAN.
+# A short script that wraps the speaker diarization services provided by
+# pyannote.audio (https://github.com/pyannote/pyannote-audio) to act as
+# a local recognizer in ELAN.
+
+#
+# TODO:
+#
+#   * Reimplement the VAD module as its own recognizer (since it's no
+#     longer compatible with the 4.x.x releases of pyannote.audio; code
+#     stripped out of here now, need to resurrect from 3.x.x recognizer)
+#
 
 import csv
 import html
@@ -15,30 +23,30 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import timeit
 
 import cpuinfo
 import numpy
 import pyannote.audio
 import pyannote.audio.pipelines
 import pyannote.audio.pipelines.utils.hook
+import pyannote.audio.telemetry
 import scipy.spatial.distance
 import torch
 
 #DEFAULT_EMBEDDING_MODEL = 'speechbrain/spkrec-ecapa-voxceleb@5c0be3875fda05e81f3c004ed8c7c06be308de1e'
-DEFAULT_EMBEDDING_MODEL = 'speechbrain/spkrec-ecapa-voxceleb'
+#DEFAULT_EMBEDDING_MODEL = 'speechbrain/spkrec-ecapa-voxceleb'
+DEFAULT_EMBEDDING_MODEL = 'pyannote/wespeaker-voxceleb-resnet34-LM'
 
 # A subclass of ProgressHook that provides updates on the status of a running
 # speech service in the format that ELAN's recognizer API expects.
 class ELANProgressHook(pyannote.audio.pipelines.utils.hook.ProgressHook):
-    def __init__(self, transient = False, mode = 'Diarization'):
+    def __init__(self, transient = False):
         self.stage = 0
         # This is hard-coded to the current release of pyannote.audio, where
         # speaker diarization involves four stages of processing and voice
         # activity detection only one.
-        if mode == 'Diarization':
-            self.num_stages = 4
-        else:
-            self.num_stages = 1
+        self.num_stages = 4
 
     def __enter__(self):
         return self
@@ -75,7 +83,6 @@ class ELANProgressHook(pyannote.audio.pipelines.utils.hook.ProgressHook):
         print(f"PROGRESS: {progress:.2f} {step}, {completed} of {total}",
             flush = True)
 
-
 # The parameters provided by the user via the ELAN recognizer interface
 # (specified in CMDI).
 params = {}
@@ -83,6 +90,9 @@ params = {}
 # Parameters for the pipeline.
 pipeline_params = {}
 
+
+# Disable pyannote.audio telemetry for the current session.
+pyannote.audio.telemetry.set_telemetry_metrics(False)
 
 # Read in all of the parameters that ELAN passes to this local recognizer on
 # stdin.
@@ -99,14 +109,25 @@ if not params.get('output_segments', ''):
 # XML/HTML-escaped (e.g., "&apos;" for "'", etc.).  Turn those back into
 # their non-escaped equivalents before using these as references to actual
 # files below.
+params['output_segments'] = html.unescape(params['output_segments'])
 params['source'] = html.unescape(params['source'])
 params['checkpoint'] = html.unescape(params['checkpoint'])
 
-# Determine which mode this script is meant to run in (voice activity
-# detection or speaker diarization), based on the first argument provided to
-# this script.
-params['mode'] = 'VAD' if (len(sys.argv) > 1 and sys.argv[1] == 'VAD') \
-    else 'Diarization'
+# Read in the Hugging Face authentication token, either from the user's
+# provided CMDI parameters (overriding any default token that is available)
+# or from the default Hugging Face token file:
+#
+# https://huggingface.co/docs/huggingface_hub/en/package_reference/environment_variables
+token = params.get('auth_token', '')
+if token:
+    token = html.unescape(token)
+else:
+    token_path = os.path.join(\
+        os.path.expanduser('~'), '.cache', 'huggingface', 'token')
+    if os.path.isfile(token_path):
+        with open(token_path, 'rt') as token_file:
+            token = token_file.readline()
+assert token, "ERROR: missing Hugging Face authentication token"
 
 # Prepare to perform speaker verification, if requested.
 speaker_embedding_pipeline = None
@@ -114,123 +135,83 @@ speaker_id_to_embedding = {}
 
 # Read and set parameters for the pipeline.
 mode_specific_args = {}
-if params['mode'] == 'VAD':
-    pipeline_params = {
-        "onset": float(params['onset']),
-        "offset": float(params['offset']),
-        "min_duration_on": float(params['min_duration_on']),
-        "min_duration_off": float(params['min_duration_off'])
-    }
-elif params['mode'] == 'Diarization':
-    pipeline_params = {
-        "segmentation": {
-            "min_duration_off": float(params['min_duration_off'])
-        }
-    }
 
-    # Some CMDI parameters for speaker diarization relate to keyword
-    # arguments that are provided when applying the pipeline to a specific
-    # audio file, rather than (hyper-)parameters that are used to instantiate
-    # the pipeline.  We gather these into a dictionary that is provided as
-    # keyword arguments when the pipeline is applied.
-    num_speakers = params['num_speakers']
-    if num_speakers != 'Unknown':
-        mode_specific_args['num_speakers'] = int(num_speakers)
+# Some CMDI parameters for speaker diarization relate to keyword arguments
+# that are provided when applying the pipeline to a specific audio file,
+# rather than (hyper-)parameters that are used to instantiate the pipeline.
+# We gather these into a dictionary that is provided as keyword arguments
+# when the pipeline is applied.
+num_speakers = params['num_speakers']
+if num_speakers != 'Unknown':
+    mode_specific_args['num_speakers'] = int(num_speakers)
 
-    min_speakers = params['min_speakers']
-    if min_speakers != '_':
-        mode_specific_args['min_speakers'] = int(min_speakers)
+min_speakers = params['min_speakers']
+if min_speakers != '_':
+    mode_specific_args['min_speakers'] = int(min_speakers)
 
-    max_speakers = params['max_speakers']
-    if max_speakers != '_':
-        mode_specific_args['max_speakers'] = int(min_speakers)
+max_speakers = params['max_speakers']
+if max_speakers != '_':
+    mode_specific_args['max_speakers'] = int(min_speakers)
 
-    # If the user has provided a speaker verification configuration file (a
-    # CSV file with two columns, 'id' (speaker ID) and 'audio' (path to audio
-    # file containing speech sample for the individual represented by this
-    # speaker ID), parse that configuration file and generate embeddings for
-    # each speaker based on the provided audio.
-    speaker_verification_csv = params.get('speaker_verification_csv', '')
-    if speaker_verification_csv:
-        mode_specific_args['return_embeddings'] = True
-        speaker_embedding_pipeline = pyannote.audio.pipelines.\
-            speaker_verification.PretrainedSpeakerEmbedding(\
-                DEFAULT_EMBEDDING_MODEL, use_auth_token = params["auth_token"])
+# If the user has provided a speaker verification configuration file (a CSV
+# file with two columns, 'id' (speaker ID) and 'audio' (path to audio file
+# containing speech sample for the individual represented by this speaker ID),
+# parse that configuration file and generate embeddings for each speaker
+# based on the provided audio.
+speaker_verification_csv = params.get('speaker_verification_csv', '')
+if speaker_verification_csv:
+    speaker_embedding_pipeline = pyannote.audio.pipelines.\
+        speaker_verification.PretrainedSpeakerEmbedding(\
+            DEFAULT_EMBEDDING_MODEL, token = token)
 
-        speaker_verification_dir = \
-            os.path.dirname(os.path.abspath(speaker_verification_csv))
-        with open(speaker_verification_csv, 'r', encoding = 'utf-8-sig') \
-                  as speaker_verification_file:
-            speaker_ver_dict = csv.DictReader(speaker_verification_file) 
-            for line in speaker_ver_dict:
-                audio_fname = os.path.join(speaker_verification_dir, \
-                    os.path.basename(line['audio']))
+    speaker_verification_dir = \
+        os.path.dirname(os.path.abspath(speaker_verification_csv))
+    with open(speaker_verification_csv, 'r', encoding = 'utf-8-sig') \
+              as speaker_verification_file:
+        speaker_ver_dict = csv.DictReader(speaker_verification_file) 
+        for line in speaker_ver_dict:
+            audio_fname = os.path.join(speaker_verification_dir, \
+                os.path.basename(line['audio']))
 
-                # Load and down-sample the audio to 16KHz as needed.
-                audio = pyannote.audio.Audio(sample_rate = 16000)
-                waveform, rate = audio(audio_fname)
+            # Load and down-sample the audio to 16KHz as needed.
+            audio = pyannote.audio.Audio(sample_rate = 16000)
+            waveform, rate = audio(audio_fname)
 
-                speaker_id_to_embedding[line['id']] = \
-                    speaker_embedding_pipeline(waveform[None])
+            speaker_id_to_embedding[line['id']] = \
+                speaker_embedding_pipeline(waveform[None])
 
 # If we've been given a (valid) model checkpoint to use for segmentation, use
 # it to instantiate the pipeline for the service that the user requested.
 pipeline = None
 if os.path.isfile(params['checkpoint']):
-    print("Loading the checkpoint for the segmentation model...", flush = True)
-    model = pyannote.audio.Model.from_pretrained(params['checkpoint'])
+    print("Creating a diarization pipeline with the segmentation model", \
+        flush = True)
+    pipeline = pyannote.audio.pipelines.SpeakerDiarization(\
+        segmentation = params['checkpoint'],
+        embedding = DEFAULT_EMBEDDING_MODEL)
 
-    if params['mode'] == 'VAD':
-        print("Creating a VAD pipeline with the seg. model", flush = True)
-        pipeline = pyannote.audio.pipelines.VoiceActivityDetection(\
-            segmentation = model)
+    # Specify minimum duration off, the segmentation threshold, and the 
+    # clustering threshold, the latter two having been finetuned as per:
+    #
+    #   https://github.com/pyannote/pyannote-audio/blob/develop/tutorials/adapting_pretrained_pipeline.ipynb
+    pipeline_params = pipeline.default_parameters()
+    pipeline_params['segmentation']['min_duration_off'] = \
+        float(params['min_duration_off'])
+    # In pyannote.audio 'community-1', the segmentation threshold parameter
+    # only exists for non-powerset models, which are no longer the default.
+    if not pipeline._segmentation.model.specifications.powerset:
+        pipeline_params['segmentation']['threshold'] = \
+            float(params['segmentation_threshold'])
+    pipeline_params['clustering']['threshold'] = \
+        float(params['clustering_threshold'])
 
-    elif params['mode'] == 'Diarization':
-        pipeline = pyannote.audio.pipelines.SpeakerDiarization(\
-            segmentation = model, 
-            embedding = DEFAULT_EMBEDDING_MODEL,
-#            embedding = "speechbrain/spkrec-ecapa-voxceleb",
-            clustering = "AgglomerativeClustering")
-
-        # Need to specify additional hyperparameters if we're using our own
-        # checkpoint as part of this diarization pipeline.  The list of para-
-        # meters required to instantiate this pipeline can be retrieved via
-        # pipeline.parameters(), and the already-instantiated parameters via
-        # pipeline.parameters(instantiated = True) (as defined in pyannote-
-        # pipeline/pyannote/pipeline/pipeline.py).  Default values specified
-        # here are taken directly from:
-        #
-        #    https://github.com/FrenchKrab/IS2023-powerset-diarization/
-        #
-        # with the exception of the segmentation and clustering thresholds,
-        # which were fine-tuned as per:
-        #
-        #   https://github.com/pyannote/pyannote-audio/blob/develop/tutorials/adapting_pretrained_pipeline.ipynb
-#        pipeline_params['segmentation']['threshold'] = 0.4442333667381752
-#        pipeline_params['segmentation']['threshold'] = 0.5577202404940658 # v0
-        pipeline_params['segmentation']['threshold'] = 0.5577202404940658 # v1
-        pipeline_params['clustering'] = {
-            "method": "centroid",
-            "min_cluster_size": 15,
-#            "threshold": 0.7153814381597874,
-#            "threshold": 0.6380173939509877,   # v0
-            "threshold": 0.6939225490462559,    # v1
-        }
-
-# Otherwise, use a pre-trained segmentation model from Hugging Face.
+# Otherwise, use a pre-trained diarization pipeline from Hugging Face.
 else:
-    if params['mode'] == 'VAD':
-        print("Loading the VAD pipeline from Hugging Face...", flush = True)
-        pipeline = pyannote.audio.Pipeline.from_pretrained(\
-            "pyannote/voice-activity-detection",
-             use_auth_token = params["auth_token"])
-
-    elif params['mode'] == 'Diarization':
-        print("Loading the speaker diarization pipeline from Hugging Face...",
-               flush = True)
-        pipeline = pyannote.audio.Pipeline.from_pretrained(\
-            "pyannote/speaker-diarization-3.0",
-             use_auth_token = params["auth_token"])
+    print("Loading the speaker diarization pipeline from Hugging Face...",
+        flush = True)
+    pipeline = pyannote.audio.Pipeline.from_pretrained(\
+        "pyannote/speaker-diarization-community-1",
+         token = token)
 
 # Use the given parameters with this pipeline.
 print("Apply parameters to pipeline...", flush = True)
@@ -254,21 +235,15 @@ elif torch.cuda.is_available() and torch.backends.cuda.is_built():
 # Perform the requested service on the given audio.
 print("Applying pipeline to audio...", flush = True)
 output = None
-embeddings = []
-with ELANProgressHook(mode = params['mode']) as hook:
-    import timeit
+with ELANProgressHook() as hook:
     start = timeit.default_timer()
-    if params['mode'] == 'Diarization' and speaker_embedding_pipeline:
-        output, embeddings = pipeline(params["source"], hook = hook, 
-            **mode_specific_args)
-    else:
-        output = pipeline(params["source"], hook = hook, **mode_specific_args)
+    output = pipeline(params["source"], hook = hook, **mode_specific_args)
     end = timeit.default_timer()
-    print(f"DEBUG: Processing on {device} took {end - start}s")
+    print(f"Applying pipeline on {device} took {end - start}s", flush = True)
 
 # Gather up the speech segments identified for each speaker by the pipeline.
 speakers = {}
-for turn, _, speaker in output.itertracks(yield_label = True):
+for turn, speaker in output.speaker_diarization:
     if not speaker in speakers:
         speakers[speaker] = []
     speakers[speaker] = speakers[speaker] + [(turn.start, turn.end)]
@@ -277,28 +252,30 @@ for turn, _, speaker in output.itertracks(yield_label = True):
 # diarization pipeline matches up with which speaker (among those for whom
 # audio samples and speaker IDs were provided in the speaker verification
 # config file).
-print(f"Have {len(embeddings)} embeddings, {len(output.labels())} output labels")
 if speaker_embedding_pipeline:
     identified_speakers = {}
-    for s, diarization_speaker_id in enumerate(output.labels()):
-        # For whatever reason, the diarization pipeline returns one-dimensional
-        # arrays with the shape (192,), rather than the two-dimensional ones 
-        # with the shape (1, 192) that this speaker verification pipeline
-        # returns (and that our cosine distance measure below expects).
-        diarization_embedding = numpy.reshape(embeddings[s], (1, 192))
+    for s, diarization_speaker_id in enumerate(speakers.keys()):
+        # Convert the one-dimensional array returned by the speaker verifi-
+        # cation pipeline into a two-dimensional one with the shape (1, n)
+        # that our cosine distance measure below expects.
+        diarization_embedding = numpy.reshape(\
+            output.speaker_embeddings[s], (1, -1))
 
-        min_distance = 1.0  # 0 = identical, 1 = opposite
+        min_distance = 0.0
         best_matching_speaker_id = None
         for (ref_speaker_id, ref_embedding) in speaker_id_to_embedding.items():
             dist = scipy.spatial.distance.cdist(diarization_embedding,
                 ref_embedding, metric = "cosine")[0, 0]
-            print(f"Comparing {diarization_speaker_id} with {ref_speaker_id} = {dist} (current min. distance = {min_distance})", flush = True)
-            if dist < min_distance:
+            print(f"Comparing {diarization_speaker_id} with "\
+                  f"{ref_speaker_id} = {dist} (current min. "\
+                  f"distance = {min_distance})", flush = True)
+            if dist > min_distance:
                 min_distance = dist
                 best_matching_speaker_id = ref_speaker_id
 
         if best_matching_speaker_id:
-            print(f"Speaker {diarization_speaker_id} is {best_matching_speaker_id}")
+            print(f"Speaker {diarization_speaker_id} is "\
+                  f"{best_matching_speaker_id}")
             identified_speakers[best_matching_speaker_id] = \
                 speakers[diarization_speaker_id]
 

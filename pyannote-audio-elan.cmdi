@@ -49,9 +49,12 @@
             <textparam level="advanced" optional="true"
                 info="HuggingFace authentication token">auth_token</textparam>
 
-            <input level="basic" type="auxiliary" optional="true"
+            <textparam level="advanced" convoc="True False" default="True"
+                info="Use custom segmentation model">use_checkpoint</textparam>
+
+            <input level="advanced" type="auxiliary" optional="true"
                 mimetypes="*"
-                info="Path to segmentation model checkpoint (.ckpt, optional)">checkpoint</input>
+                info="Path to custom segmentation model (.ckpt; optional)">checkpoint</input>
 
             <textparam level="basic" convoc="Unknown 1 2 3 4 5 6 7 8 9" 
                 default="Unknown"

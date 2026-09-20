@@ -14,6 +14,7 @@
 #
 
 import csv
+import glob
 import html
 import os
 import os.path
@@ -111,6 +112,7 @@ if not params.get('output_segments', ''):
 # files below.
 params['output_segments'] = html.unescape(params['output_segments'])
 params['source'] = html.unescape(params['source'])
+params['use_checkpoint'] = html.unescape(params['use_checkpoint'])
 params['checkpoint'] = html.unescape(params['checkpoint'])
 
 # Read in the Hugging Face authentication token, either from the user's
@@ -183,12 +185,25 @@ if speaker_verification_csv:
 # If we've been given a (valid) model checkpoint to use for segmentation, use
 # it to instantiate the pipeline for the service that the user requested.
 pipeline = None
-if os.path.isfile(params['checkpoint']):
+if params['use_checkpoint'] == 'True':
+    # If we've been asked to use a checkpoint, but the one that the user
+    # provided isn't available, try to load the one supplied with pyannote-
+    # audio-elan.
+    checkpoint = params['checkpoint']
+    if not os.path.isfile(checkpoint):
+        checkpoints = glob.glob('*.ckpt')
+        if not checkpoints:
+            print("ERROR: Custom segmentation model requested, but none "\
+                  "available", flush = True)
+            sys.exit(-1)
+
+        checkpoint = checkpoints[0]
+        print(f"Found default segmentation model {checkpoint}", flush = True)
+
     print("Creating a diarization pipeline with the segmentation model", \
         flush = True)
     pipeline = pyannote.audio.pipelines.SpeakerDiarization(\
-        segmentation = params['checkpoint'],
-        embedding = DEFAULT_EMBEDDING_MODEL)
+        segmentation = checkpoint, embedding = DEFAULT_EMBEDDING_MODEL)
 
     # Specify minimum duration off, the segmentation threshold, and the 
     # clustering threshold, the latter two having been finetuned as per:

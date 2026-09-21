@@ -75,11 +75,18 @@
                 mimetypes="text/csv"
                 info="Speaker verification configuration (CSV) (optional)">speaker_verification_csv</input>
 
-            <numparam level="advanced" type="float" min="0.001" max="0.999" default="0.45210161462756127"
-                info="Segmentation threshold (diarization hyperparameter)">segmentation_threshold</numparam>
-
-            <numparam level="advanced" type="float" min="0.001" max="0.999" default="0.7433178174378083"
+            <!-- previously 0.7433178174378083 -->
+            <numparam level="advanced" type="float" min="0.001" max="0.999"
+                default="0.6739335620280171"
                 info="Clustering threshold (diarization hyperparameter)">clustering_threshold</numparam>
+
+            <numparam level="advanced" type="float" min="0.01" max="1.0"
+                default="0.07"
+                info="Fa (acoustic scaling factor; diarization hyperparameter)">Fa</numparam>
+
+            <numparam level="advanced" type="float" min="0.01" max="2.0"
+                default="0.8"
+                info="Fb (speaker regularization coefficient; diarization hyperparameter)">Fb</numparam>
 
             <output level="basic" type="tier" optional="false"
                 mimetypes="text/xml" 

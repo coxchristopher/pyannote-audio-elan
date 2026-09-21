@@ -219,6 +219,8 @@ if params['use_checkpoint'] == 'True':
             float(params['segmentation_threshold'])
     pipeline_params['clustering']['threshold'] = \
         float(params['clustering_threshold'])
+    pipeline_params['clustering']['Fa'] = float(params['Fa'])
+    pipeline_params['clustering']['Fb'] = float(params['Fb'])
 
 # Otherwise, use a pre-trained diarization pipeline from Hugging Face.
 else:
